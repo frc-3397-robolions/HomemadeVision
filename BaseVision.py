@@ -53,17 +53,12 @@ def getContours(img, imgContour):
     #try cv2.RETR_TREE?
     contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area>1000:
-            para = cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, 0.02*para, True)
-            x,y,w,h = cv2.boundingRect(approx)
-            if len(approx)>20:
-                continue
-            cv2.drawContours(imgContour, cnt, -1, (255, 0, 255), 3)
-            cv2.rectangle(imgContour, (x, y), (x+w, y+h), (0, 255, 0), 5)
-            cv2.putText(imgContour, "Points: "+str(len(approx)), (x+w+20, y+20), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(imgContour, "Area: "+str(int(area)), (x+w+20, y+45), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 255, 0), 2)
+        M = cv2.moments(cnt)
+        cX = int(M['m10']/M['m00']) 
+        cY = int(M['m01']/M['m00'])
+
+        # Print the x,y coordinates of the center
+        print(cX, cY)
 
 #filter out pixels not of a certain color
 def hsv_filter(img):
@@ -91,7 +86,7 @@ def find_edges(img):
 
 
 #read config data from config.json
-brightness, threshold1, threshold2, h_min, h_max, s_min, s_max, v_min, v_max = read_config()
+brightness, threshold1, threshold2, h_min, h_max, s_min, s_max, v_min, v_max, robot_ip = read_config()
 #use config data as defaults for trackbars
 createTrackbars(brightness, empty, threshold1, threshold2, h_min, h_max, s_min, s_max, v_min, v_max)
 
