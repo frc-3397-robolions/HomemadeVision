@@ -1,7 +1,20 @@
-from networktables import NetworkTables
-NetworkTables.initialize(server="127.0.0.1")
+import cv2
+import numpy as np
 
-table = NetworkTables.getTable('results')
+vid = cv2.VideoCapture(0)
 
 while True:
-    table.putNumber('data', 1)
+    if vid.isOpened():
+        empty, frame = vid.read()
+        data = cv2.imencode('.jpg', frame)[1].tostring()
+
+        # Intermediary socket stuffs
+
+        nparr = np.frombuffer(data, np.uint8)
+        newFrame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        cv2.imshow("s", newFrame)
+
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+vid.release()

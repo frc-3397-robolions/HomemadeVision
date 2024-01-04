@@ -8,8 +8,9 @@
     "s_max": 111,
     "v_min": 0,
     "v_max": 30,
-    "robot_ip": "10.33.97.2",
+    "robot_ip": "127.0.0.1",
     "camera": 0,
     "frameWidth": 640,
-    "frameHeight": 480
+    "frameHeight": 480,
+    "max_fps": 30
 }

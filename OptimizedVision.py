@@ -1,6 +1,6 @@
 #Error Key:
 # >=0: No error
-# -1: No contour found
+# -1: No contour/Apriltag found found
 # -2: Exception on coprocessor. Could be a camera error
 # -3: Robot code didn't find a value on NetworkTables
 # -4: Processing disabled
@@ -8,10 +8,13 @@
 import cv2
 import numpy as np
 import json
+import time
 from networktables import NetworkTables
+from networktables import NetworkTable
+from pupil_apriltags import Detector
+import multiprocessing
 
 
-#find the contours and draw them on the image
 def findCenter(contours):
     if len(contours) == 0:
         return -1, -1
@@ -55,6 +58,7 @@ robot_ip = config["robot_ip"]
 camera = config["camera"]
 frameWidth = config["frameWidth"] 
 frameHeight = config["frameHeight"]
+max_fps = config["max_fps"]
 
 cap = cv2.VideoCapture(camera)
 cap.set(3, frameWidth)
@@ -64,16 +68,7 @@ NetworkTables.initialize(server=robot_ip)
 table = NetworkTables.getTable('vision')
 
 
-#main loop
-while True:
-    #Check NT to see if should disable.
-    if table.getBoolean("Vision Enabled",True) == False:
-        table.putNumber('Target X', -4)
-        table.putNumber('Target Y', -4)
-        continue
-    # Read the next frame from the camera
-    success, img = cap.read()
-    # Make a copy of the original image to draw contours on later
+def process_target(findCenter, hsv_filter, find_edges, brightness, table, img):
     try:
         # Adjust brightness of image
         img = cv2.convertScaleAbs(img, alpha=brightness/100)
@@ -97,8 +92,41 @@ while True:
     targetX, targetY = findCenter(contours)
     table.putNumber('Target X', targetX)
     table.putNumber('Target Y', targetY)
+april_detector = Detector()
+def find_apriltags(img, table: NetworkTable):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    tags = april_detector.detect(gray, estimate_tag_pose=True, camera_params=[30,30,0,0], tag_size=0.06)
+    # print(tags)
+    # copy = draw_tags(copy, tags)
+    # cv2.imshow("Result", copy)
+    if len(tags)==0:
+        table.putValue('April Tags', [-1])
+        return
+    table.putValue("April Tags",tags)
 
+#main loop
+while True:
+    start = time.time()
+    #Check NT to see if should disable.
+    if table.getBoolean("Vision Enabled",True) == False:
+        table.putNumber('Target X', -4)
+        table.putNumber('Target Y', -4)
+        continue
+    # Read the next frame from the camera
+    success, img = cap.read()
+    # Send the raw frame to the driver station
+    img_bytes = cv2.imencode('.jpg', img)[1].tobytes()
+    print(img_bytes)
+    table.putRaw("Raw Frame", img_bytes)
+    # Also publishes results to NT
+    process_target(findCenter, hsv_filter, find_edges, brightness, table, img)
+    find_apriltags(img, table)
 
+    #calculate process time and keep under 30 fps
+    elapsed_time = time.time() - start
+    if elapsed_time < 1/max_fps:
+        time.sleep((1/max_fps) - elapsed_time)
+    table.putNumber("FPS", (1/(time.time()-start)))
     # Quit on pressing 'q'
     if cv2.waitKey(1) == ord('q'):
         cap.release()
